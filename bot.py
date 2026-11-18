@@ -16,6 +16,28 @@ telebot.apihelper.CONNECT_TIMEOUT = 60
 telebot.apihelper.READ_TIMEOUT = 60
 
 DATA_FILE = "members_data.json"
+# كود استيراد الأعضاء القدامى من ملف الإكسل عند تشغيل البوت لأول مرة
+EXCEL_IMPORT_FILE = "tradingview_members.xlsx"
+if not os.path.exists(DATA_FILE) and os.path.exists(EXCEL_IMPORT_FILE):
+    try:
+        df_init = pd.read_excel(EXCEL_IMPORT_FILE)
+        initial_data = {}
+        for _, row in df_init.iterrows():
+            uid = str(row.get('المعرف (ID)', ''))
+            if uid and uid != 'nan':
+                initial_data[uid] = {
+                    'المعرف (ID)': uid,
+                    'الاسم': str(row.get('الاسم', '')),
+                    'يوزر تيليجرام': str(row.get('يوزر تيليجرام', 'لا يوجد')),
+                    'يوزر TradingView': str(row.get('يوزر TradingView', 'غير مدخل')),
+                    'الحالة': str(row.get('الحالة', 'متواجد'))
+                }
+        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(initial_data, f, ensure_ascii=False, indent=4)
+        members_data = initial_data
+        print(f"تم استيراد {len(initial_data)} عضواً بنجاح من ملف الإكسل القديم!")
+    except Exception as e:
+        print(f"خطأ في استيراد ملف الإكسل: {e}")
 
 # قائمة معرفات المالكين أو المشرفين
 ADMIN_IDS = ["331668623", "329119501"]  # الآي دي الخاص بك وبأصدقائك
