@@ -15,7 +15,6 @@ telebot.apihelper.READ_TIMEOUT = 60
 DATA_FILE = "members_data.json"
 ADMIN_IDS = ["331668623", "329119501"]
 
-
 INITIAL_MEMBERS = {
     "1087968824": {"المعرف (ID)": 1087968824, "الاسم": "Group", "يوزر تيليجرام": "@GroupAnonymousBot", "يوزر TradingView": "B.albudayri", "الحالة": "متواجد"},
     "331668623": {"المعرف (ID)": 331668623, "الاسم": "BANDAR", "يوزر تيليجرام": "@b0111s", "يوزر TradingView": "b_albudayri", "الحالة": "متواجد"},
@@ -404,7 +403,7 @@ INITIAL_MEMBERS = {
     "1035080142": {"المعرف (ID)": 1035080142, "الاسم": "Dr Vascu", "يوزر تيليجرام": "@drVascu", "يوزر TradingView": "mistro129", "الحالة": "متواجد"},
     "895371801": {"المعرف (ID)": 895371801, "الاسم": "R", "يوزر تيليجرام": "@l90876l", "يوزر TradingView": "غير مدخل", "الحالة": "متواجد"},
     "552968060": {"المعرف (ID)": 552968060, "الاسم": "امـ ** ــوون .. 💘", "يوزر تيليجرام": "لا يوجد", "يوزر TradingView": "غير مدخل", "الحالة": "متواجد"},
-    "6494166932": {"المعرف (ID)": 6494166932, "الاسم": "محمد", "يوزر تيليجرام": "لا يوجد", "يوزر TradingView": "غير مدخل", "الحالة": "متواجد"},
+    "6494166932": {"المعرف (ID)": 6494166932, "الاسم": "محمد", "يوزر تيليجرام": "لا يوجد", "يوزر TradingView": "mohaaamed1616", "الحالة": "متواجد"},
     "6007416884": {"المعرف (ID)": 6007416884, "الاسم": "SAUD", "يوزر تيليجرام": "@sg_485", "يوزر TradingView": "‏saud480", "الحالة": "متواجد"},
     "1328594053": {"المعرف (ID)": 1328594053, "الاسم": "Mtb", "يوزر تيليجرام": "@Ljuf1200", "يوزر TradingView": "Mtbs1402", "الحالة": "متواجد"},
     "9008350973": {"المعرف (ID)": 9008350973, "الاسم": "عبدالهادي", "يوزر تيليجرام": "لا يوجد", "يوزر TradingView": "غير مدخل", "الحالة": "متواجد"},
@@ -436,49 +435,37 @@ def _read_excel_members(path="tradingview_members.xlsx"):
                 uid = str(int(uid_raw)) if isinstance(uid_raw, (int, float)) else str(uid_raw).strip()
                 if uid and uid.lower() != 'nan':
                     id_val = int(uid) if uid.isdigit() else uid
+                    status_raw = row.get('الحالة', 'متواجد')
                     excel_members[uid] = {
                         'المعرف (ID)': id_val,
                         'الاسم': '' if pd.isna(row.get('الاسم', '')) else str(row.get('الاسم', '')),
                         'يوزر تيليجرام': 'لا يوجد' if pd.isna(row.get('يوزر تيليجرام', 'لا يوجد')) else str(row.get('يوزر تيليجرام', 'لا يوجد')),
                         'يوزر TradingView': 'غير مدخل' if pd.isna(row.get('يوزر TradingView', 'غير مدخل')) else str(row.get('يوزر TradingView', 'غير مدخل')),
-                        'الحالة': 'متواجد' if pd.isna(row.get('الحالة', 'متواجد')) or str(row.get('الحالة', '')).strip() == '' else str(row.get('الحالة', 'متواجد'))
+                        'الحالة': 'متواجد' if pd.isna(status_raw) or str(status_raw).strip() == '' else str(status_raw)
                     }
         except Exception as e:
             print(f"خطأ قراءة ملف الإكسل: {e}")
     return excel_members
 
-# قاعدة بيانات الأعضاء المضمونة لضمان ظهور السجلات كاملة دائماً
 def load_data():
+    merged_members = dict(INITIAL_MEMBERS)
+    excel_members = _read_excel_members("tradingview_members.xlsx")
+    if excel_members:
+        merged_members.update(excel_members)
+
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                if data:
-                    return data
-        except Exception:
-            pass
-    
-    # محاولة قراءة ملف الإكسل المرفوع إذا لم يوجد ملف بيانات
-    members = {}
-    if os.path.exists("tradingview_members.xlsx"):
-        try:
-            df = pd.read_excel("tradingview_members.xlsx")
-            for _, row in df.iterrows():
-                uid = str(row.get('المعرف (ID)', ''))
-                if uid and uid != 'nan':
-                    members[uid] = {
-                        'المعرف (ID)': row.get('المعرف (ID)', ''),
-                        'الاسم': str(row.get('الاسم', '')),
-                        'يوزر تيليجرام': str(row.get('يوزر تيليجرام', 'لا يوجد')),
-                        'يوزر TradingView': str(row.get('يوزر TradingView', 'غير مدخل')),
-                        'الحالة': str(row.get('الحالة', 'متواجد'))
-                    }
-        except Exception:
-            pass
-            
-    return members
+                if isinstance(data, dict) and data:
+                    merged_members.update(data)
+        except Exception as e:
+            print(f"خطأ قراءة ملف JSON: {e}")
+
+    return merged_members
 
 members_data = load_data()
+
 def save_data():
     try:
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
@@ -486,8 +473,7 @@ def save_data():
     except Exception as e:
         print(f"خطأ بالحفظ: {e}")
 
-if not os.path.exists(DATA_FILE) and members_data:
-    save_data()
+save_data()
 
 waiting_for_tradingview = {}
 
@@ -570,6 +556,14 @@ def welcome_new_member(message):
             }
         save_data()
 
+        try:
+            bot.send_message(
+                message.chat.id,
+                f"حياك الله يا {first_name} في المجموعة 🌟"
+            )
+        except Exception as e:
+            print(f"خطأ إرسال الترحيب: {e}")
+
 @bot.message_handler(content_types=['left_chat_member'])
 def member_left(message):
     user = message.left_chat_member
@@ -605,18 +599,18 @@ def send_welcome(message):
         if len(message.text.split()) > 1 and message.text.split()[1] == 'register':
             if already_registered:
                 saved_tv = members_data[user_id]['يوزر TradingView']
-                bot.reply_to(message, f"⚠️ أنت مسجل مسبقاً بالفعل!\nيوزر TradingView الخاص بك هو: `{saved_tv}`", parse_mode="Markdown")
+                bot.reply_to(message, f"حياك الله يا {first_name} 🌟\nأنت مسجل مسبقاً بالفعل!\nيوزر TradingView الخاص بك هو: `{saved_tv}`", parse_mode="Markdown")
             else:
                 waiting_for_tradingview[user_id] = True
-                bot.reply_to(message, f"أهلاً بك يا {first_name} 🌟\nمن فضلك أرسل الآن اسم المستخدم (Username) الخاص بك في TradingView:")
+                bot.reply_to(message, f"حياك الله يا {first_name} 🌟\nمن فضلك أرسل الآن اسم المستخدم (Username) الخاص بك في TradingView:")
         else:
             if already_registered:
                 saved_tv = members_data[user_id]['يوزر TradingView']
-                bot.reply_to(message, f"أهلاً بك يا {first_name}.\nأنت مسجل بالفعل ويوزرك في TradingView هو: `{saved_tv}`", parse_mode="Markdown")
+                bot.reply_to(message, f"حياك الله يا {first_name} 🌟\nأنت مسجل بالفعل ويوزرك في TradingView هو: `{saved_tv}`", parse_mode="Markdown")
             else:
                 markup = types.InlineKeyboardMarkup()
                 markup.add(types.InlineKeyboardButton("📝 تسجيل يوزر TradingView", callback_data="btn_register"))
-                bot.reply_to(message, f"أهلاً بك يا {first_name} في بوت التوثيق.", reply_markup=markup)
+                bot.reply_to(message, f"حياك الله يا {first_name} في بوت التوثيق 🌟", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
@@ -669,9 +663,9 @@ def export_to_excel(message):
         return
 
     try:
-        df = pd.DataFrame(list(members_data.values()))
+        df_out = pd.DataFrame(list(members_data.values()))
         file_name = "tradingview_members.xlsx"
-        df.to_excel(file_name, index=False, engine='openpyxl')
+        df_out.to_excel(file_name, index=False, engine='openpyxl')
 
         wb = openpyxl.load_workbook(file_name)
         ws = wb.active
@@ -715,5 +709,5 @@ def export_to_excel(message):
     except Exception as e:
         bot.reply_to(message, f"حدث خطأ أثناء إنتاج الملف: {e}")
 
-print("البوت يعمل الآن بكامل الطاقة وقراءة الإكسل المباشرة...")
+print("البوت يعمل الآن...")
 bot.infinity_polling()
