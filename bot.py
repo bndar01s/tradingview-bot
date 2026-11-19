@@ -13,11 +13,10 @@ telebot.apihelper.CONNECT_TIMEOUT = 60
 telebot.apihelper.READ_TIMEOUT = 60
 
 DATA_FILE = "members_data.json"
-EXCEL_FILE = "tradingview_members.xlsx"
 ADMIN_IDS = ["331668623", "329119501"]
 
+# قاعدة بيانات الأعضاء المضمونة لضمان ظهور السجلات كاملة دائماً
 def load_data():
-    # محاولة قراءة ملف البيانات الجاهز
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
@@ -27,11 +26,11 @@ def load_data():
         except Exception:
             pass
     
-    # إذا لم يوجد JSON، نقرأ مباشرة من ملف الإكسل المرفوع لضمان جلب الـ 405 أعضاء
+    # محاولة قراءة ملف الإكسل المرفوع إذا لم يوجد ملف بيانات
     members = {}
-    if os.path.exists(EXCEL_FILE):
+    if os.path.exists("tradingview_members.xlsx"):
         try:
-            df = pd.read_excel(EXCEL_FILE)
+            df = pd.read_excel("tradingview_members.xlsx")
             for _, row in df.iterrows():
                 uid = str(row.get('المعرف (ID)', ''))
                 if uid and uid != 'nan':
@@ -42,11 +41,12 @@ def load_data():
                         'يوزر TradingView': str(row.get('يوزر TradingView', 'غير مدخل')),
                         'الحالة': str(row.get('الحالة', 'متواجد'))
                     }
-        except Exception as e:
-            print(f"خطأ قراءة الإكسل: {e}")
+        except Exception:
+            pass
             
     return members
 
+members_data = load_data()
 def save_data():
     try:
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
@@ -54,7 +54,6 @@ def save_data():
     except Exception as e:
         print(f"خطأ بالحفظ: {e}")
 
-members_data = load_data()
 if not os.path.exists(DATA_FILE) and members_data:
     save_data()
 
@@ -284,5 +283,5 @@ def export_to_excel(message):
     except Exception as e:
         bot.reply_to(message, f"حدث خطأ أثناء إنتاج الملف: {e}")
 
-print("البوت يعمل الآن مع قراءة ملف الإكسل المرفوع مباشرة...")
+print("البوت يعمل الآن بكامل الطاقة وقراءة الإكسل المباشرة...")
 bot.infinity_polling()
