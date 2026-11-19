@@ -5,51 +5,47 @@ import openpyxl
 from openpyxl.styles import PatternFill, Font
 import os
 import json
-import time
-import threading
 
 TOKEN = '8249661500:AAF-8Co6x9EamaMqm8Taj2XSXViQzK4fC8U'
 bot = telebot.TeleBot(TOKEN)
 
-# رفع مهلة الاتصال لتجنب أخطاء انقطاع الاتصال مع سيرفرات تيليجرام
 telebot.apihelper.CONNECT_TIMEOUT = 60
 telebot.apihelper.READ_TIMEOUT = 60
 
 DATA_FILE = "members_data.json"
-# كود استيراد الأعضاء القدامى من ملف الإكسل عند تشغيل البوت لأول مرة
-EXCEL_IMPORT_FILE = "tradingview_members.xlsx"
-if not os.path.exists(DATA_FILE) and os.path.exists(EXCEL_IMPORT_FILE):
-    try:
-        df_init = pd.read_excel(EXCEL_IMPORT_FILE)
-        initial_data = {}
-        for _, row in df_init.iterrows():
-            uid = str(row.get('المعرف (ID)', ''))
-            if uid and uid != 'nan':
-                initial_data[uid] = {
-                    'المعرف (ID)': uid,
-                    'الاسم': str(row.get('الاسم', '')),
-                    'يوزر تيليجرام': str(row.get('يوزر تيليجرام', 'لا يوجد')),
-                    'يوزر TradingView': str(row.get('يوزر TradingView', 'غير مدخل')),
-                    'الحالة': str(row.get('الحالة', 'متواجد'))
-                }
-        with open(DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(initial_data, f, ensure_ascii=False, indent=4)
-        members_data = initial_data
-        print(f"تم استيراد {len(initial_data)} عضواً بنجاح من ملف الإكسل القديم!")
-    except Exception as e:
-        print(f"خطأ في استيراد ملف الإكسل: {e}")
-
-# قائمة معرفات المالكين أو المشرفين
-ADMIN_IDS = ["331668623", "329119501"]  # الآي دي الخاص بك وبأصدقائك
+EXCEL_FILE = "tradingview_members.xlsx"
+ADMIN_IDS = ["331668623", "329119501"]
 
 def load_data():
+    # محاولة قراءة ملف البيانات الجاهز
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if data:
+                    return data
         except Exception:
-            return {}
-    return {}
+            pass
+    
+    # إذا لم يوجد JSON، نقرأ مباشرة من ملف الإكسل المرفوع لضمان جلب الـ 405 أعضاء
+    members = {}
+    if os.path.exists(EXCEL_FILE):
+        try:
+            df = pd.read_excel(EXCEL_FILE)
+            for _, row in df.iterrows():
+                uid = str(row.get('المعرف (ID)', ''))
+                if uid and uid != 'nan':
+                    members[uid] = {
+                        'المعرف (ID)': row.get('المعرف (ID)', ''),
+                        'الاسم': str(row.get('الاسم', '')),
+                        'يوزر تيليجرام': str(row.get('يوزر تيليجرام', 'لا يوجد')),
+                        'يوزر TradingView': str(row.get('يوزر TradingView', 'غير مدخل')),
+                        'الحالة': str(row.get('الحالة', 'متواجد'))
+                    }
+        except Exception as e:
+            print(f"خطأ قراءة الإكسل: {e}")
+            
+    return members
 
 def save_data():
     try:
@@ -59,9 +55,11 @@ def save_data():
         print(f"خطأ بالحفظ: {e}")
 
 members_data = load_data()
+if not os.path.exists(DATA_FILE) and members_data:
+    save_data()
+
 waiting_for_tradingview = {}
 
-# أمر لنشر رسالة التسجيل في القناة أو المجموعة (للمالكين فقط)
 @bot.message_handler(commands=['post_register'])
 def post_register_message(message):
     if str(message.from_user.id) not in ADMIN_IDS:
@@ -94,7 +92,6 @@ def post_register_message(message):
     except Exception as e:
         bot.reply_to(message, f"❌ حدث خطأ أثناء النشر: {e}")
 
-# أمر تعديل بيانات أي عضو (للمالكين فقط)
 @bot.message_handler(commands=['edit'])
 def admin_edit_member(message):
     if str(message.from_user.id) not in ADMIN_IDS:
@@ -105,7 +102,6 @@ def admin_edit_member(message):
         return
 
     args = message.text.split()
-
     if len(args) >= 3:
         target_id = args[1]
         new_tv = " ".join(args[2:])
@@ -120,7 +116,6 @@ def admin_edit_member(message):
     else:
         bot.reply_to(message, f"❌ العضو بمعرف `{target_id}` غير مسجل في قاعدة البيانات بعد.", parse_mode="Markdown")
 
-# الترحيب بالجدد
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome_new_member(message):
     for user in message.new_chat_members:
@@ -144,7 +139,6 @@ def welcome_new_member(message):
             }
         save_data()
 
-# مراقبة الخروج
 @bot.message_handler(content_types=['left_chat_member'])
 def member_left(message):
     user = message.left_chat_member
@@ -154,7 +148,6 @@ def member_left(message):
             members_data[user_id]['الحالة'] = '❌ خرج من المجموعة'
             save_data()
 
-# التعامل مع /start في الخاص
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = str(message.from_user.id)
@@ -207,7 +200,6 @@ def callback_inline(call):
             bot.answer_callback_query(call.id)
             bot.send_message(call.message.chat.id, "أرسل الآن اسم المستخدم (Username) الخاص بك في TradingView:")
 
-# حفظ يوزر TradingView
 @bot.message_handler(func=lambda message: message.chat.type == 'private' and str(message.from_user.id) in waiting_for_tradingview)
 def capture_tradingview_username(message):
     user_id = str(message.from_user.id)
@@ -235,7 +227,6 @@ def capture_tradingview_username(message):
     save_data()
     bot.reply_to(message, f"✅ تم حفظ وتوثيق حساب TradingView بنجاح: `{tradingview_username}`\nلن تحتاج للتسجيل مرة أخرى.", parse_mode="Markdown")
 
-# أمر تصدير الإكسل (للمالكين فقط)
 @bot.message_handler(commands=['excel', 'export'])
 def export_to_excel(message):
     if str(message.from_user.id) not in ADMIN_IDS:
@@ -253,7 +244,6 @@ def export_to_excel(message):
 
         wb = openpyxl.load_workbook(file_name)
         ws = wb.active
-
         ws.sheet_view.rightToLeft = True
 
         red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
@@ -294,5 +284,5 @@ def export_to_excel(message):
     except Exception as e:
         bot.reply_to(message, f"حدث خطأ أثناء إنتاج الملف: {e}")
 
-print("البوت يعمل الآن بصلاحيات مالكين متعددين...")
+print("البوت يعمل الآن مع قراءة ملف الإكسل المرفوع مباشرة...")
 bot.infinity_polling()
